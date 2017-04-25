@@ -1,0 +1,63 @@
+# -*- coding:utf-8 -*-
+
+import scrapy
+from scrapytest.items import ScrapytestItem
+from scrapy.selector import Selector
+from scrapy.http import HtmlResponse
+
+class ScrapytestSpider(scrapy.Spider):
+	## 给出当前蜘蛛的名字 ## 必须是独有的 ## 也就意味着 可以设置多个蜘蛛 ##
+	name = 'scrapytest_dmoz'
+	allowed_domains = ['dmoz.org']
+	## 起始的url列表 ##
+	start_urls = [
+		'http://www.dmoz.org/Computers/Programming/Languages/Python/Books/',
+		'http://www.dmoz.org/Computers/Programming/Languages/Python/Resources/'
+	]
+	## 定义一个获取其他url，且通过不断回调解析函数，来爬取内容 ##
+	def parse(self, response):
+		## response 是scrapy自定义的获取页面内容的object ##
+		for href in response.css("ul.directory.dir-col > li > a::attr('href')"):
+			print "href.extract() is:"+str(href.extract())
+			url = response.urljoin(href.extract())
+			## 上面一行代码等价于: url = urlparse.urljoin(response.url, href.extract()) ##
+			## 基于response.url, 将href.extract()根据某种规则合成一个可用的url ##
+			yield scrapy.Request(url, callback=self.parse_dir_contents)
+			## (1) 解释上面的yield ##
+			## yield将parse函数由一个普通函数变为生成器 ##
+			## 细节：程序执行parse里面的循环，当执行到yield时，会返回当前的迭代值 ##
+			## notice: 这个有点像，中断了一下 ##
+			## 当下一个迭代时，代码从中断的地方继续执行 ##直到再次遇到yield ##
+			## 作用：这里用yield的好处是节省内存 ##
+			## (2) 解析scrapy.Request(url, callback) ##
+			## scrapy.Request是个类 ## 表示了HTTP-request 页面请求##
+			## notice: 这里就是初始化一个页面请求对象 ##
+			## 页面请求，在Downloader中被执行 ## 并且产生response ##
+			## url::是当前HTTP-request的url ##
+			## callback::处理HTTP-request执行结果response的函数 ##
+			## (3) 这个for循环的用途 ##
+			## 对当前的一个页面返回结果response，推理出linked的其他url列表 ##
+			## 对每一个可用的url，产生一个个request请求的对象，同时带入解析函数 ##
+	## 定义一个如何解析网页的函数 ##
+	## 在官方介绍中，scrapy会为每个url生成一个scrapy.Request的对象 ##
+	## 并且，将parse_dir_contents作为它们的回调函数 ##
+	## 疑问？回调函数，如何保证调用时，response就是对应的呢？##
+	def parse_dir_contents(self, response):
+#	def parse(self, response):
+		## 定位书信息的位置 ##
+		cont = response.xpath('//div[@id="site-list-content"]')
+		for each_cont in cont:
+			## 定位 每一本数据的信息所在位置 ##
+			all_info = each_cont.xpath('//div[@class="title-and-desc"]')
+			for each in all_info:
+				## 提取信息 ## title/link/desc ##
+				item = ScrapytestItem()
+				item['title']  = each.xpath('./a/div[@class="site-title"]/text()').extract()
+				item['link'] = each.xpath('./a[@target="_blank"]/@href').extract()
+				item['desc']  = each.xpath('./div[@class="site-descr "]/text()').extract()
+				print 'item["title"]:'+str(item['title'])
+				print 'item["link"]:'+str(item['link'])
+				print 'item["desc"]:'+str(item['desc'])
+				yield item
+				## 将parse做成一个生成器，可以节省内存空间 ##
+				## 每次都将这个item返回到外面，直到外面调用parse.netx()才继续执行下一个item的生成 ##

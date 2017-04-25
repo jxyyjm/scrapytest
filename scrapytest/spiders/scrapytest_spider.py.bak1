@@ -1,0 +1,35 @@
+# -*- coding:utf-8 -*-
+
+import scrapy
+from scrapytest.items import ScrapytestItem
+from scrapy.selector import Selector
+from scrapy.http import HtmlResponse
+
+class ScrapytestSpider(scrapy.Spider):
+	## 给出当前蜘蛛的名字 ## 必须是独有的 ## 也就意味着 可以设置多个蜘蛛 ##
+	name = 'scrapytest_dmoz'
+	allowed_domains = ['dmoz.org']
+	## 起始的url列表 ##
+	start_urls = [
+		'http://www.dmoz.org/Computers/Programming/Languages/Python/Books/',
+		'http://www.dmoz.org/Computers/Programming/Languages/Python/Resources/'
+	]
+	## 定义一个获取其他url，且通过不断回调解析函数，来爬取内容 ##
+	def parse(self, response):
+		## 定位书信息的位置 ##
+		cont = response.xpath('//div[@id="site-list-content"]')
+		for each_cont in cont:
+			## 定位 每一本数据的信息所在位置 ##
+			all_info = each_cont.xpath('//div[@class="title-and-desc"]')
+			for each in all_info:
+				## 提取信息 ## title/link/desc ##
+				item = ScrapytestItem()
+				item['title']  = each.xpath('./a/div[@class="site-title"]/text()').extract()
+				item['link'] = each.xpath('./a[@target="_blank"]/@href').extract()
+				item['desc']  = each.xpath('./div[@class="site-descr "]/text()').extract()
+				print 'item["title"]:'+str(item['title'])
+				print 'item["link"]:'+str(item['link'])
+				print 'item["desc"]:'+str(item['desc'])
+				yield item
+				## 将parse做成一个生成器，可以节省内存空间 ##
+				## 每次都将这个item返回到外面，直到外面调用parse.netx()才继续执行下一个item的生成 ##

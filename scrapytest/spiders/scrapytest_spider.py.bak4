@@ -1,0 +1,60 @@
+# -*- coding:utf-8 -*-
+
+import scrapy
+from scrapytest.items import ScrapytestItem
+from scrapy.selector import Selector
+from scrapy.http import HtmlResponse
+
+class ScrapytestSpider(scrapy.Spider):
+	name = 'scrapytest_house'
+	allowed_domains = ['jn.fang.com']
+	start_urls = [
+		'http://lvdicheng0531.fang.com/'
+	]
+	def parse(self, response):
+		## 针对详情页，抽取信息 ##
+		domain = response.xpath('//head/title/text()').extract()
+		cont = response.xpath('//div[@class="firstbox"]') ## 定位到信息框 ##
+		for each_cont in cont:
+			## 提取信息 ##
+			item = ScrapytestItem()
+			## (1) xingzheng_domain 行政区
+			item['domain'] = domain if domain else ""
+			## (2) name_domain 小区名称
+			item['name'] = each_cont.xpath('.//p/span[@title]/text()').extract()
+			## (3) price_m2 每平方米价格
+			item['price']  = each_cont.xpath('.//p/span[@class="prib cn_ff"]/text()').extract()
+			item['type'] = each_cont.xpath('.//div[@id]/p/a[@href and @target="_blank"]/text()').extract()
+			item['opentime']  = each_cont.xpath('.//p/a[@id and @title and @href and @target="_blank"]/text()').extract()
+			print 'domain : '+str(item['domain'])
+			print 'name   : '+str(item['name'])
+			print 'price  : '+str(item['price'])
+			print 'type   : '+str(item['type'])
+			print 'opentime:'+str(item['opentime'])
+			yield item
+		## 从当前的response中提取出新的url 网址 ##
+		for href in response.css("ul.directory.dir-col > li > a::attr('href')"):
+			print "href.extract() is:"+str(href.extract())
+			url = response.urljoin(href.extract())
+			yield scrapy.Request(url, callback=self.parse_dir_contents)
+	## 定义一个对页面请求返回结果response处理的函数 ##
+	def parse_dir_contents(self, response):
+		domain = response.xpath('//head/title/text()').extract()
+		cont = response.xpath('//div[@class="firstbox"]') ## 定位到信息框 ##
+		for each_cont in cont:
+			## 提取信息 ##
+			item = ScrapytestItem()
+			## (1) xingzheng_domain 行政区
+			item['domain'] = domain if domain else ""
+			## (2) name_domain 小区名称
+			item['name'] = each_cont.xpath('.//p/span[@title]/text()').extract()
+			## (3) price_m2 每平方米价格
+			item['price']  = each_cont.xpath('.//p/span[@class="prib cn_ff"]/text()').extract()
+			item['type'] = each_cont.xpath('.//div[@id]/p/a[@href and @target="_blank"]/text()').extract()
+			item['opentime']  = each_cont.xpath('.//p/a[@id and @title and @href and @target="_blank"]/text()').extract()
+			print 'domain : '+str(item['domain'])
+			print 'name   : '+str(item['name'])
+			print 'price  : '+str(item['price'])
+			print 'type   : '+str(item['type'])
+			print 'opentime:'+str(item['opentime'])
+			yield item
